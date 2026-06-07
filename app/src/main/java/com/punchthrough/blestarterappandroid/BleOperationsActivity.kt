@@ -184,29 +184,17 @@ class BleOperationsActivity : AppCompatActivity() {
 
     @SuppressLint("InflateParams")
     private fun showWritePayloadDialog(characteristic: BluetoothGattCharacteristic) {
-        val hexField = layoutInflater.inflate(R.layout.edittext_hex_payload, null) as EditText
+        val json = """{"ts":1717860000,"tz":330,"src":"Arun_Phone"}"""
+        val bytes = json.toByteArray(Charsets.UTF_8)
         AlertDialog.Builder(this)
-            .setView(hexField)
+            .setTitle("Write Time Sync Response")
+            .setMessage("Write:\n$json")
             .setPositiveButton("Write") { _, _ ->
-                with(hexField.text.toString()) {
-                    if (isNotBlank() && isNotEmpty()) {
-                        val bytes = hexToBytes()
-                        log("Writing to ${characteristic.uuid}: ${bytes.toHexString()}")
-                        ConnectionManager.writeCharacteristic(device, characteristic, bytes)
-                    } else {
-                        log("Please enter a hex payload to write to ${characteristic.uuid}")
-                    }
-                }
+                log("Writing to ${characteristic.uuid}: ${bytes.toHexString()}")
+                ConnectionManager.writeCharacteristic(device, characteristic, bytes)
             }
             .setNegativeButton("Cancel", null)
-            .create()
-            .apply {
-                window?.setSoftInputMode(
-                    WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
-                )
-                hexField.showKeyboard()
-                show()
-            }
+            .show()
     }
 
     private val connectionEventListener by lazy {

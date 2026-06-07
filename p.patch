@@ -1,0 +1,218 @@
+diff --git a/app/src/main/java/com/punchthrough/blestarterappandroid/BleOperationsActivity.kt b/app/src/main/java/com/punchthrough/blestarterappandroid/BleOperationsActivity.kt
+index f99335c..2ec846a 100644
+--- a/app/src/main/java/com/punchthrough/blestarterappandroid/BleOperationsActivity.kt
++++ b/app/src/main/java/com/punchthrough/blestarterappandroid/BleOperationsActivity.kt
+@@ -184,29 +184,17 @@ class BleOperationsActivity : AppCompatActivity() {
+
+     @SuppressLint("InflateParams")
+     private fun showWritePayloadDialog(characteristic: BluetoothGattCharacteristic) {
+-        val hexField = layoutInflater.inflate(R.layout.edittext_hex_payload, null) as EditText
++        val json = """{"ts":1717860000,"tz":330,"src":"Arun_Phone"}"""
++        val bytes = json.toByteArray(Charsets.UTF_8)
+         AlertDialog.Builder(this)
+-            .setView(hexField)
++            .setTitle("Write Time Sync Response")
++            .setMessage("Write:\n$json")
+             .setPositiveButton("Write") { _, _ ->
+-                with(hexField.text.toString()) {
+-                    if (isNotBlank() && isNotEmpty()) {
+-                        val bytes = hexToBytes()
+-                        log("Writing to ${characteristic.uuid}: ${bytes.toHexString()}")
+-                        ConnectionManager.writeCharacteristic(device, characteristic, bytes)
+-                    } else {
+-                        log("Please enter a hex payload to write to ${characteristic.uuid}")
+-                    }
+-                }
++                log("Writing to ${characteristic.uuid}: ${bytes.toHexString()}")
++                ConnectionManager.writeCharacteristic(device, characteristic, bytes)
+             }
+             .setNegativeButton("Cancel", null)
+-            .create()
+-            .apply {
+-                window?.setSoftInputMode(
+-                    WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+-                )
+-                hexField.showKeyboard()
+-                show()
+-            }
++            .show()
+     }
+
+     private val connectionEventListener by lazy {
+diff --git a/app/src/main/java/com/punchthrough/blestarterappandroid/ble/BleExtensions.kt b/app/src/main/java/com/punchthrough/blestarterappandroid/ble/BleExtensions.kt
+index 257ebca..40a9b6b 100644
+--- a/app/src/main/java/com/punchthrough/blestarterappandroid/ble/BleExtensions.kt
++++ b/app/src/main/java/com/punchthrough/blestarterappandroid/ble/BleExtensions.kt
+@@ -29,6 +29,15 @@ import java.util.UUID
+ /** UUID of the Client Characteristic Configuration Descriptor (0x2902). */
+ const val CCC_DESCRIPTOR_UUID = "00002902-0000-1000-8000-00805F9B34FB"
+
++// TODO: Replace with the actual UUID of the custom time service on your tracker
++const val TIME_SERVICE_UUID = "00000000-0000-0000-0000-000000000000"
++
++// TODO: Replace with the UUID of the characteristic the tracker uses to NOTIFY/INDICATE a time request
++const val TIME_REQUEST_CHAR_UUID = "00000000-0000-0000-0000-000000000000"
++
++// TODO: Replace with the UUID of the characteristic the phone WRITES the time response to
++const val TIME_RESPONSE_CHAR_UUID = "00000000-0000-0000-0000-000000000000"
++
+ // BluetoothGatt
+
+ fun BluetoothGatt.printGattTable() {
+diff --git a/app/src/main/java/com/punchthrough/blestarterappandroid/ble/ConnectionManager.kt b/app/src/main/java/com/punchthrough/blestarterappandroid/ble/ConnectionManager.kt
+index 3b3896a..85e49e5 100644
+--- a/app/src/main/java/com/punchthrough/blestarterappandroid/ble/ConnectionManager.kt
++++ b/app/src/main/java/com/punchthrough/blestarterappandroid/ble/ConnectionManager.kt
+@@ -34,6 +34,7 @@ import android.os.Looper
+ import android.os.Parcelable
+ import timber.log.Timber
+ import java.lang.ref.WeakReference
++import java.util.TimeZone
+ import java.util.UUID
+ import java.util.concurrent.ConcurrentHashMap
+ import java.util.concurrent.ConcurrentLinkedQueue
+@@ -53,6 +54,9 @@ object ConnectionManager {
+     private val operationQueue = ConcurrentLinkedQueue<BleOperationType>()
+     private var pendingOperation: BleOperationType? = null
+
++    // Time-sync: stores the response char UUID so we can write to it when a request arrives
++    private var timeResponseCharUuid: UUID? = null
++
+     fun servicesOnDevice(device: BluetoothDevice): List<BluetoothGattService>? =
+         deviceGattMap[device]?.services
+
+@@ -372,6 +376,7 @@ object ConnectionManager {
+                     printGattTable()
+                     requestMtu(device, GATT_MAX_MTU_SIZE)
+                     listenersAsSet.forEach { it.get()?.onConnectionSetupComplete?.invoke(this) }
++                    startTimeSync(gatt)
+                 } else {
+                     Timber.e("Service discovery failed due to status $status")
+                     teardownConnection(gatt.device)
+@@ -462,6 +467,11 @@ object ConnectionManager {
+                 when (status) {
+                     BluetoothGatt.GATT_SUCCESS -> {
+                         Timber.i("Wrote to characteristic $uuid | value: ${writtenValue?.toHexString()}")
++                        if (uuid.toString().equals(TIME_RESPONSE_CHAR_UUID, ignoreCase = true)) {
++                            val hex = writtenValue?.toHexString() ?: "empty"
++                            val ascii = writtenValue?.let { String(it, Charsets.UTF_8) } ?: ""
++                            Timber.i("[TimeSync] Response write SUCCESS | hex: $hex | ascii: $ascii")
++                        }
+                         listenersAsSet.forEach { it.get()?.onCharacteristicWrite?.invoke(gatt.device, this) }
+                     }
+                     BluetoothGatt.GATT_WRITE_NOT_PERMITTED -> {
+@@ -486,6 +496,12 @@ object ConnectionManager {
+         ) {
+             with(characteristic) {
+                 Timber.i("Characteristic $uuid changed | value: ${value.toHexString()}")
++
++                // Time-sync: check if this is a time request from the tracker
++                if (uuid.toString().equals(TIME_REQUEST_CHAR_UUID, ignoreCase = true)) {
++                    handleTimeSyncRequest(gatt, this, value)
++                }
++
+                 listenersAsSet.forEach {
+                     it.get()?.onCharacteristicChanged?.invoke(gatt.device, this, value)
+                 }
+@@ -498,6 +514,12 @@ object ConnectionManager {
+             value: ByteArray
+         ) {
+             Timber.i("Characteristic ${characteristic.uuid} changed | value: ${value.toHexString()}")
++
++            // Time-sync: check if this is a time request from the tracker
++            if (characteristic.uuid.toString().equals(TIME_REQUEST_CHAR_UUID, ignoreCase = true)) {
++                handleTimeSyncRequest(gatt, characteristic, value)
++            }
++
+             listenersAsSet.forEach {
+                 it.get()?.onCharacteristicChanged?.invoke(gatt.device, characteristic, value)
+             }
+@@ -666,4 +688,88 @@ object ConnectionManager {
+         Build.VERSION.SDK_INT > Build.VERSION_CODES.TIRAMISU -> getParcelableExtra(key, T::class.java)
+         else -> @Suppress("DEPRECATION") getParcelableExtra(key) as? T
+     }
++
++    // =====================================================================
++    // Time-sync feature: phone responds to tracker's time-request notification
++    // =====================================================================
++
++    private fun startTimeSync(gatt: BluetoothGatt) {
++        val timeService = gatt.services?.firstOrNull { service ->
++            service.uuid.toString().equals(TIME_SERVICE_UUID, ignoreCase = true)
++        }
++        if (timeService == null) {
++            Timber.i("[TimeSync] Time service ($TIME_SERVICE_UUID) not found on this device")
++            return
++        }
++        Timber.i("[TimeSync] Time service found: $TIME_SERVICE_UUID")
++
++        val requestChar = timeService.characteristics?.firstOrNull { char ->
++            char.uuid.toString().equals(TIME_REQUEST_CHAR_UUID, ignoreCase = true)
++        }
++        if (requestChar == null) {
++            Timber.i("[TimeSync] Request characteristic ($TIME_REQUEST_CHAR_UUID) not found")
++            return
++        }
++        Timber.i("[TimeSync] Request characteristic found: $TIME_REQUEST_CHAR_UUID")
++
++        val responseChar = timeService.characteristics?.firstOrNull { char ->
++            char.uuid.toString().equals(TIME_RESPONSE_CHAR_UUID, ignoreCase = true)
++        }
++        if (responseChar == null) {
++            Timber.i("[TimeSync] Response characteristic ($TIME_RESPONSE_CHAR_UUID) not found")
++            return
++        }
++        Timber.i("[TimeSync] Response characteristic found: $TIME_RESPONSE_CHAR_UUID")
++
++        // Store the response char UUID so we can write to it when a request comes in
++        timeResponseCharUuid = responseChar.uuid
++
++        // Enable notifications/indications on the request characteristic
++        if (requestChar.isNotifiable() || requestChar.isIndicatable()) {
++            Timber.i("[TimeSync] Enabling notifications on request characteristic...")
++            enqueueOperation(EnableNotifications(gatt.device, requestChar.uuid))
++        } else {
++            Timber.w("[TimeSync] Request characteristic supports neither notify nor indicate")
++        }
++    }
++
++    private fun handleTimeSyncRequest(
++        gatt: BluetoothGatt,
++        characteristic: BluetoothGattCharacteristic,
++        value: ByteArray
++    ) {
++        val payload = String(value, Charsets.UTF_8)
++        Timber.i("[TimeSync] Request payload received: \"$payload\"")
++
++        if (!payload.contains("get_time")) {
++            Timber.i("[TimeSync] Payload does not request time sync; ignoring")
++            return
++        }
++
++        val responseJson = buildTimeSyncResponse()
++        Timber.i("[TimeSync] Writing response: $responseJson")
++
++        val responseCharUuid = timeResponseCharUuid
++        if (responseCharUuid == null) {
++            Timber.e("[TimeSync] Response characteristic UUID not stored; cannot write response")
++            return
++        }
++
++        val responseBytes = responseJson.toByteArray(Charsets.UTF_8)
++        enqueueOperation(
++            CharacteristicWrite(
++                device = gatt.device,
++                characteristicUuid = responseCharUuid,
++                writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT,
++                payload = responseBytes
++            )
++        )
++        Timber.i("[TimeSync] Response enqueued for write")
++    }
++
++    private fun buildTimeSyncResponse(): String {
++        val ts = System.currentTimeMillis() / 1000L
++        val tz = TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60000
++        return """{"ts":$ts,"tz":$tz,"src":"Arun_Phone"}"""
++    }
+ }

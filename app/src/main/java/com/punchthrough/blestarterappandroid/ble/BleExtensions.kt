@@ -29,6 +29,15 @@ import java.util.UUID
 /** UUID of the Client Characteristic Configuration Descriptor (0x2902). */
 const val CCC_DESCRIPTOR_UUID = "00002902-0000-1000-8000-00805F9B34FB"
 
+// TODO: Replace with the actual UUID of the custom time service on your tracker
+const val TIME_SERVICE_UUID = "00000000-0000-0000-0000-000000000000"
+
+// TODO: Replace with the UUID of the characteristic the tracker uses to NOTIFY/INDICATE a time request
+const val TIME_REQUEST_CHAR_UUID = "00000000-0000-0000-0000-000000000000"
+
+// TODO: Replace with the UUID of the characteristic the phone WRITES the time response to
+const val TIME_RESPONSE_CHAR_UUID = "00000000-0000-0000-0000-000000000000"
+
 // BluetoothGatt
 
 fun BluetoothGatt.printGattTable() {
