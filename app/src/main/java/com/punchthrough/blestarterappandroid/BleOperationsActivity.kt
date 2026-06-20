@@ -207,7 +207,9 @@ class BleOperationsActivity : AppCompatActivity() {
             "GPS Location",
             "?\n?",
             "sensor_gps"
-        )
+        ) {
+            sendSensorRefresh("GPS Location", "sensor_gps")
+        }
         configureRow(
             binding.wifiRow,
             "≋",
