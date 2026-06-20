@@ -17,6 +17,8 @@ import com.punchthrough.blestarterappandroid.ble.ConnectionManager.parcelableExt
 import com.punchthrough.blestarterappandroid.databinding.ActivityBleOperationsBinding
 import com.punchthrough.blestarterappandroid.databinding.DialogSensorSettingsBinding
 import com.punchthrough.blestarterappandroid.databinding.RowDashboardTemplateBinding
+import org.json.JSONException
+import org.json.JSONObject
 import timber.log.Timber
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -120,6 +122,7 @@ class BleOperationsActivity : AppCompatActivity() {
         val line = payload.trimEnd('\r', '\n')
         if (line.isEmpty()) return
 
+        updateDummyValue(line)
         val currentText = binding.rawDataText.text
         binding.rawDataText.text = if (currentText.isNullOrEmpty()) {
             line
@@ -128,6 +131,21 @@ class BleOperationsActivity : AppCompatActivity() {
         }
         binding.rawDataScrollView.post {
             binding.rawDataScrollView.fullScroll(View.FOCUS_DOWN)
+        }
+    }
+
+    private fun updateDummyValue(payload: String) {
+        try {
+            val dummyData = JSONObject(payload).optJSONObject("sensor_dummy_data") ?: return
+            if (dummyData.optString("name") != "sensor_dummy" || !dummyData.has("val")) {
+                return
+            }
+
+            val value = dummyData.get("val").toString()
+            binding.updatedRow.metricValue.text = value
+            Timber.i("Dummy sensor value updated: $value")
+        } catch (exception: JSONException) {
+            Timber.w(exception, "Notification payload is not valid JSON")
         }
     }
 
@@ -187,7 +205,7 @@ class BleOperationsActivity : AppCompatActivity() {
             binding.updatedRow,
             "◷",
             "Dummy",
-            "09:31:25\nUTC",
+            "--",
             "sensor_dummy"
         ) {
             sendSensorRefresh("Dummy", "sensor_dummy")
