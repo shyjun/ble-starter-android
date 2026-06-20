@@ -154,7 +154,7 @@ class BleOperationsActivity : AppCompatActivity() {
             binding.heartRateRow,
             "♡",
             "Heart Rate",
-            "72\nBPM",
+            "?\nBPM",
             "sensor_hr"
         ) {
             sendHeartRateRefresh()
@@ -163,42 +163,42 @@ class BleOperationsActivity : AppCompatActivity() {
             binding.stepsRow,
             "♧",
             "Step Count",
-            "1250\nsteps",
+            "?\nsteps",
             "sensor_steps"
         )
         configureRow(
             binding.temperatureRow,
             "♨",
             "Temperature",
-            "37.1\n°C",
+            "?\n°C",
             "sensor_temperature"
         )
         configureRow(
             binding.batteryRow,
             "▯",
             "Battery Level",
-            "82\n%",
+            "?\n%",
             "sensor_battery"
         )
         configureRow(
             binding.accelerometerRow,
             "⌁",
             "Accelerometer",
-            "0.12\n-0.03, 9.81",
+            "?\n?, ?",
             "sensor_accelerometer"
         )
         configureRow(
             binding.gpsRow,
             "⌖",
             "GPS Location",
-            "12.9716\n77.5946",
+            "?\n?",
             "sensor_gps"
         )
         configureRow(
             binding.wifiRow,
             "≋",
             "WiFi RSSI",
-            "-56\ndBm",
+            "?\ndBm",
             "sensor_wifi"
         )
         configureRow(
