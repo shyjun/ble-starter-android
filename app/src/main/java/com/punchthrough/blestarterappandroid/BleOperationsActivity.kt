@@ -25,6 +25,10 @@ private val TRACK_TAIL_SERVICE_UUID: UUID =
     UUID.fromString("78563412-7856-3412-5678-123412345678")
 private val TRACK_TAIL_WRITE_CHARACTERISTIC_UUID: UUID =
     UUID.fromString("78563412-7856-3412-5678-123412345680")
+private val TRACK_TAIL_NOTIFICATION_CHARACTERISTIC_UUID: UUID =
+    UUID.fromString("78563412-7856-3412-5678-123412345679")
+private val CCCD_UUID: UUID =
+    UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
 class BleOperationsActivity : AppCompatActivity() {
 
@@ -45,6 +49,7 @@ class BleOperationsActivity : AppCompatActivity() {
         showDeviceDetails()
         setupDashboardRows()
         setupActions()
+        subscribeToNotifications()
         showMainTab(showToast = false)
     }
 
@@ -74,6 +79,56 @@ class BleOperationsActivity : AppCompatActivity() {
         binding.clearButton.setOnClickListener { toast("Clear pressed") }
         binding.pauseButton.setOnClickListener { toast("Pause pressed") }
         binding.saveLogButton.setOnClickListener { toast("Save Log pressed") }
+    }
+
+    private fun subscribeToNotifications() {
+        val service = ConnectionManager.servicesOnDevice(device)
+            ?.firstOrNull { it.uuid == TRACK_TAIL_SERVICE_UUID }
+        if (service == null) {
+            Timber.e("Notification service not found: $TRACK_TAIL_SERVICE_UUID")
+            toast("Notification setup failed: BLE service not found")
+            return
+        }
+        Timber.i("Notification service found: ${service.uuid}")
+
+        val characteristic =
+            service.getCharacteristic(TRACK_TAIL_NOTIFICATION_CHARACTERISTIC_UUID)
+        if (characteristic == null) {
+            Timber.e(
+                "Notification characteristic not found: " +
+                    TRACK_TAIL_NOTIFICATION_CHARACTERISTIC_UUID
+            )
+            toast("Notification setup failed: characteristic not found")
+            return
+        }
+        Timber.i("Notification characteristic found: ${characteristic.uuid}")
+
+        if (characteristic.getDescriptor(CCCD_UUID) == null) {
+            Timber.e(
+                "Notification CCCD not found: characteristic=${characteristic.uuid}, " +
+                    "descriptor=$CCCD_UUID"
+            )
+            toast("Notification setup failed: CCCD not found")
+            return
+        }
+        Timber.i("Notification CCCD found: $CCCD_UUID")
+
+        ConnectionManager.enableNotifications(device, characteristic)
+    }
+
+    private fun appendRawNotification(payload: String) {
+        val line = payload.trimEnd('\r', '\n')
+        if (line.isEmpty()) return
+
+        val currentText = binding.rawDataText.text
+        binding.rawDataText.text = if (currentText.isNullOrEmpty()) {
+            line
+        } else {
+            "$currentText\n$line"
+        }
+        binding.rawDataScrollView.post {
+            binding.rawDataScrollView.fullScroll(View.FOCUS_DOWN)
+        }
     }
 
     private fun setupDashboardRows() {
@@ -361,6 +416,30 @@ class BleOperationsActivity : AppCompatActivity() {
                     )
                     runOnUiThread {
                         toast("$label failed (BLE status $status)")
+                    }
+                }
+            }
+            onNotificationsEnabled = { callbackDevice, characteristic ->
+                if (callbackDevice == device &&
+                    characteristic.uuid == TRACK_TAIL_NOTIFICATION_CHARACTERISTIC_UUID
+                ) {
+                    Timber.i(
+                        "Notification subscription success: ${characteristic.uuid}"
+                    )
+                    runOnUiThread {
+                        toast("BLE notifications enabled")
+                    }
+                }
+            }
+            onCharacteristicChanged = { callbackDevice, characteristic, value ->
+                if (callbackDevice == device &&
+                    characteristic.uuid == TRACK_TAIL_NOTIFICATION_CHARACTERISTIC_UUID
+                ) {
+                    val payload = value.toString(Charsets.UTF_8)
+                    Timber.i("Notification received: ${characteristic.uuid}")
+                    Timber.i("Raw payload string: $payload")
+                    runOnUiThread {
+                        appendRawNotification(payload)
                     }
                 }
             }

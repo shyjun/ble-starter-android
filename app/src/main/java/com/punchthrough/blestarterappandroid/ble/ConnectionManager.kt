@@ -171,7 +171,13 @@ object ConnectionManager {
         if (device.isConnected() &&
             (characteristic.isIndicatable() || characteristic.isNotifiable())
         ) {
-            enqueueOperation(EnableNotifications(device, characteristic.uuid))
+            enqueueOperation(
+                EnableNotifications(
+                    device,
+                    characteristic.service?.uuid,
+                    characteristic.uuid
+                )
+            )
         } else if (!device.isConnected()) {
             Timber.e("Not connected to ${device.address}, cannot enable notifications")
         } else if (!characteristic.isIndicatable() && !characteristic.isNotifiable()) {
@@ -183,7 +189,13 @@ object ConnectionManager {
         if (device.isConnected() &&
             (characteristic.isIndicatable() || characteristic.isNotifiable())
         ) {
-            enqueueOperation(DisableNotifications(device, characteristic.uuid))
+            enqueueOperation(
+                DisableNotifications(
+                    device,
+                    characteristic.service?.uuid,
+                    characteristic.uuid
+                )
+            )
         } else if (!device.isConnected()) {
             Timber.e("Not connected to ${device.address}, cannot disable notifications")
         } else if (!characteristic.isIndicatable() && !characteristic.isNotifiable()) {
@@ -316,7 +328,10 @@ object ConnectionManager {
                 }
             }
             is EnableNotifications -> with(operation) {
-                gatt.findCharacteristic(characteristicUuid)?.let { characteristic ->
+                gatt.findCharacteristic(
+                    characteristicUuid,
+                    serviceUuid
+                )?.let { characteristic ->
                     val cccdUuid = UUID.fromString(CCC_DESCRIPTOR_UUID)
                     val payload = when {
                         characteristic.isIndicatable() ->
@@ -344,7 +359,10 @@ object ConnectionManager {
                 }
             }
             is DisableNotifications -> with(operation) {
-                gatt.findCharacteristic(characteristicUuid)?.let { characteristic ->
+                gatt.findCharacteristic(
+                    characteristicUuid,
+                    serviceUuid
+                )?.let { characteristic ->
                     val cccdUuid = UUID.fromString(CCC_DESCRIPTOR_UUID)
                     characteristic.getDescriptor(cccdUuid)?.let { cccDescriptor ->
                         if (!gatt.setCharacteristicNotification(characteristic, false)) {

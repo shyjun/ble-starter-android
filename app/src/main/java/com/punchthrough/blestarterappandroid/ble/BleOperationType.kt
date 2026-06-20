@@ -109,12 +109,14 @@ data class DescriptorRead(
 /** Enable notifications/indications on a characteristic represented by [characteristicUuid]. */
 data class EnableNotifications(
     override val device: BluetoothDevice,
+    val serviceUuid: UUID?,
     val characteristicUuid: UUID
 ) : BleOperationType()
 
 /** Disable notifications/indications on a characteristic represented by [characteristicUuid]. */
 data class DisableNotifications(
     override val device: BluetoothDevice,
+    val serviceUuid: UUID?,
     val characteristicUuid: UUID
 ) : BleOperationType()
 
