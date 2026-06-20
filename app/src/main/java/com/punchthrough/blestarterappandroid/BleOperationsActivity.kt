@@ -15,9 +15,11 @@ import com.punchthrough.blestarterappandroid.ble.ConnectionEventListener
 import com.punchthrough.blestarterappandroid.ble.ConnectionManager
 import com.punchthrough.blestarterappandroid.ble.ConnectionManager.parcelableExtraCompat
 import com.punchthrough.blestarterappandroid.databinding.ActivityBleOperationsBinding
+import com.punchthrough.blestarterappandroid.databinding.DialogSensorSettingsBinding
 import com.punchthrough.blestarterappandroid.databinding.RowDashboardTemplateBinding
 import timber.log.Timber
 import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
 
 private val TRACK_TAIL_SERVICE_UUID: UUID =
     UUID.fromString("78563412-7856-3412-5678-123412345678")
@@ -27,6 +29,8 @@ private val TRACK_TAIL_WRITE_CHARACTERISTIC_UUID: UUID =
 class BleOperationsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityBleOperationsBinding
+    private val sensorSettings = mutableMapOf<String, SensorSetting>()
+    private val pendingWrites = ConcurrentLinkedQueue<PendingWrite>()
     private val device: BluetoothDevice by lazy {
         intent.parcelableExtraCompat(BluetoothDevice.EXTRA_DEVICE)
             ?: error("Missing BluetoothDevice from MainActivity")
@@ -73,21 +77,64 @@ class BleOperationsActivity : AppCompatActivity() {
     }
 
     private fun setupDashboardRows() {
-        configureRow(binding.heartRateRow, "♡", "Heart Rate", "72\nBPM") {
+        configureRow(
+            binding.heartRateRow,
+            "♡",
+            "Heart Rate",
+            "72\nBPM",
+            "sensor_hr"
+        ) {
             sendHeartRateRefresh()
         }
-        configureRow(binding.stepsRow, "♧", "Step Count", "1250\nsteps")
-        configureRow(binding.temperatureRow, "♨", "Temperature", "37.1\n°C")
-        configureRow(binding.batteryRow, "▯", "Battery Level", "82\n%")
+        configureRow(
+            binding.stepsRow,
+            "♧",
+            "Step Count",
+            "1250\nsteps",
+            "sensor_steps"
+        )
+        configureRow(
+            binding.temperatureRow,
+            "♨",
+            "Temperature",
+            "37.1\n°C",
+            "sensor_temperature"
+        )
+        configureRow(
+            binding.batteryRow,
+            "▯",
+            "Battery Level",
+            "82\n%",
+            "sensor_battery"
+        )
         configureRow(
             binding.accelerometerRow,
             "⌁",
             "Accelerometer",
-            "0.12\n-0.03, 9.81"
+            "0.12\n-0.03, 9.81",
+            "sensor_accelerometer"
         )
-        configureRow(binding.gpsRow, "⌖", "GPS Location", "12.9716\n77.5946")
-        configureRow(binding.wifiRow, "≋", "WiFi RSSI", "-56\ndBm")
-        configureRow(binding.updatedRow, "◷", "Last Updated", "09:31:25\nUTC")
+        configureRow(
+            binding.gpsRow,
+            "⌖",
+            "GPS Location",
+            "12.9716\n77.5946",
+            "sensor_gps"
+        )
+        configureRow(
+            binding.wifiRow,
+            "≋",
+            "WiFi RSSI",
+            "-56\ndBm",
+            "sensor_wifi"
+        )
+        configureRow(
+            binding.updatedRow,
+            "◷",
+            "Last Updated",
+            "09:31:25\nUTC",
+            "sensor_last_updated"
+        )
     }
 
     private fun configureRow(
@@ -95,6 +142,7 @@ class BleOperationsActivity : AppCompatActivity() {
         icon: String,
         label: String,
         value: String,
+        sensorName: String,
         onRefresh: (() -> Unit)? = null
     ) {
         row.metricIcon.text = icon
@@ -104,22 +152,24 @@ class BleOperationsActivity : AppCompatActivity() {
             onRefresh?.invoke() ?: toast("$label refresh pressed")
         }
         row.metricSettingsButton.setOnClickListener {
-            toast("$label settings pressed")
+            showSensorSettingsDialog(icon, label, sensorName)
         }
     }
 
     private fun sendHeartRateRefresh() {
         Timber.i("Refresh button clicked: Heart Rate")
 
-        val json = buildHeartRateRefreshJson()
-        Timber.i("JSON payload generated: $json")
+        sendBleCommand("Heart Rate request", buildHeartRateRefreshCommand())
+    }
 
+    private fun sendBleCommand(label: String, command: String): Boolean {
+        Timber.i("JSON payload generated: $command")
         val service = ConnectionManager.servicesOnDevice(device)
             ?.firstOrNull { it.uuid == TRACK_TAIL_SERVICE_UUID }
         if (service == null) {
             Timber.e("Service not found: $TRACK_TAIL_SERVICE_UUID")
-            toast("Heart Rate request failed: BLE service not found")
-            return
+            toast("$label failed: BLE service not found")
+            return false
         }
         Timber.i("Service found: ${service.uuid}")
 
@@ -129,8 +179,8 @@ class BleOperationsActivity : AppCompatActivity() {
                 "Characteristic not found: service=$TRACK_TAIL_SERVICE_UUID, " +
                     "characteristic=$TRACK_TAIL_WRITE_CHARACTERISTIC_UUID"
             )
-            toast("Heart Rate request failed: writable characteristic not found")
-            return
+            toast("$label failed: command characteristic not found")
+            return false
         }
         Timber.i("Characteristic found: ${characteristic.uuid}")
 
@@ -138,31 +188,104 @@ class BleOperationsActivity : AppCompatActivity() {
             Timber.e(
                 "Characteristic ${characteristic.uuid} does not support WRITE_TYPE_DEFAULT"
             )
-            toast("Heart Rate request failed: characteristic is not writable")
-            return
+            toast("$label failed: characteristic is not writable")
+            return false
         }
 
         Timber.i("Submitting BLE write to existing ConnectionManager queue")
+        val pendingWrite = PendingWrite(label)
+        pendingWrites.add(pendingWrite)
         val queued = ConnectionManager.writeCharacteristic(
             device,
             characteristic,
-            json.toByteArray(Charsets.UTF_8)
+            command.toByteArray(Charsets.UTF_8)
         )
-        toast(
-            if (queued) {
-                "Heart Rate request queued"
-            } else {
-                "Heart Rate request failed: BLE is not connected"
-            }
-        )
+        if (!queued) {
+            pendingWrites.remove(pendingWrite)
+            toast("$label failed: BLE is not connected")
+            return false
+        }
+        if (pendingWrites.contains(pendingWrite)) {
+            toast("$label queued")
+        }
+        return true
     }
 
-    private fun buildHeartRateRefreshJson(): String {
+    private fun buildHeartRateRefreshCommand(): String {
         return "GET_DATA_FROM_BLE:{" +
             " \"ID\": \"1\"," +
             " \"time\": ${System.currentTimeMillis()}," +
             " \"action\": { \"msg_id\": 2, \"sensor\": \"sensor_hr\" }" +
             " }"
+    }
+
+    private fun buildSensorSettingsCommand(sensorName: String, interval: Int): String {
+        return "GET_DATA_FROM_BLE:{" +
+            " \"ID\": \"1\"," +
+            " \"time\": ${System.currentTimeMillis()}," +
+            " \"action\": {" +
+            " \"msg_id\": 1," +
+            " \"sensor\": \"$sensorName\"," +
+            " \"interval\": $interval" +
+            " }" +
+            " }"
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun showSensorSettingsDialog(
+        icon: String,
+        label: String,
+        sensorName: String
+    ) {
+        val currentSetting = sensorSettings.getOrPut(sensorName) { SensorSetting() }
+        var selectedInterval = currentSetting.interval
+        val dialogBinding = DialogSensorSettingsBinding.inflate(layoutInflater)
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogBinding.root)
+            .create()
+
+        dialogBinding.sensorIcon.text = icon
+        dialogBinding.dialogTitle.text = "$label Settings"
+        dialogBinding.enabledDescription.text = "Enable or disable $label sensor updates."
+        dialogBinding.enabledSwitch.isChecked = currentSetting.enabled
+        dialogBinding.intervalValue.text = selectedInterval.toString()
+
+        dialogBinding.decreaseButton.setOnClickListener {
+            selectedInterval = (selectedInterval - INTERVAL_STEP_SECONDS)
+                .coerceAtLeast(MIN_INTERVAL_SECONDS)
+            dialogBinding.intervalValue.text = selectedInterval.toString()
+        }
+        dialogBinding.increaseButton.setOnClickListener {
+            selectedInterval = (selectedInterval + INTERVAL_STEP_SECONDS)
+                .coerceAtMost(MAX_INTERVAL_SECONDS)
+            dialogBinding.intervalValue.text = selectedInterval.toString()
+        }
+        dialogBinding.closeButton.setOnClickListener { dialog.dismiss() }
+        dialogBinding.cancelButton.setOnClickListener { dialog.dismiss() }
+        dialogBinding.okButton.setOnClickListener {
+            val enabled = dialogBinding.enabledSwitch.isChecked
+            val changed = enabled != currentSetting.enabled ||
+                selectedInterval != currentSetting.interval
+            if (!changed) {
+                dialog.dismiss()
+                return@setOnClickListener
+            }
+
+            val command = buildSensorSettingsCommand(sensorName, selectedInterval)
+            if (sendBleCommand("$label settings", command)) {
+                currentSetting.enabled = enabled
+                currentSetting.interval = selectedInterval
+                dialog.dismiss()
+            }
+        }
+
+        dialog.setOnShowListener {
+            dialog.window?.setLayout(
+                (resources.displayMetrics.widthPixels * DIALOG_WIDTH_RATIO).toInt(),
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+        dialog.show()
     }
 
     private fun isWriteWithResponseSupported(
@@ -214,12 +337,12 @@ class BleOperationsActivity : AppCompatActivity() {
                 if (callbackDevice == device &&
                     characteristic.uuid == TRACK_TAIL_WRITE_CHARACTERISTIC_UUID
                 ) {
+                    val label = pendingWrites.poll()?.label ?: "BLE command"
                     Timber.i(
-                        "BLE write success callback received for Heart Rate refresh: " +
-                            characteristic.uuid
+                        "BLE write success callback received for $label: ${characteristic.uuid}"
                     )
                     runOnUiThread {
-                        toast("Heart Rate request sent successfully")
+                        toast("$label sent successfully")
                     }
                 }
             }
@@ -227,15 +350,31 @@ class BleOperationsActivity : AppCompatActivity() {
                 if (callbackDevice == device &&
                     characteristic.uuid == TRACK_TAIL_WRITE_CHARACTERISTIC_UUID
                 ) {
+                    val label = pendingWrites.poll()?.label ?: "BLE command"
                     Timber.e(
-                        "BLE write failure callback received for Heart Rate refresh: " +
+                        "BLE write failure callback received for $label: " +
                             "characteristic=${characteristic.uuid}, status=$status"
                     )
                     runOnUiThread {
-                        toast("Heart Rate request failed (BLE status $status)")
+                        toast("$label failed (BLE status $status)")
                     }
                 }
             }
         }
+    }
+
+    private data class SensorSetting(
+        var enabled: Boolean = true,
+        var interval: Int = DEFAULT_INTERVAL_SECONDS
+    )
+
+    private data class PendingWrite(val label: String)
+
+    private companion object {
+        const val DEFAULT_INTERVAL_SECONDS = 30
+        const val INTERVAL_STEP_SECONDS = 5
+        const val MIN_INTERVAL_SECONDS = 5
+        const val MAX_INTERVAL_SECONDS = 3600
+        const val DIALOG_WIDTH_RATIO = 0.90
     }
 }
