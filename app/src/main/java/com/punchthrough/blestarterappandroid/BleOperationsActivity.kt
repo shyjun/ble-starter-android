@@ -376,14 +376,12 @@ class BleOperationsActivity : AppCompatActivity() {
         binding.mainContent.visibility = View.VISIBLE
         binding.rawDataContent.visibility = View.GONE
         selectTab(binding.mainTab, binding.rawDataTab)
-        if (showToast) toast("Main tab pressed")
     }
 
     private fun showRawDataTab() {
         binding.mainContent.visibility = View.GONE
         binding.rawDataContent.visibility = View.VISIBLE
         selectTab(binding.rawDataTab, binding.mainTab)
-        toast("Raw Data tab pressed")
     }
 
     private fun selectTab(selected: TextView, unselected: TextView) {
