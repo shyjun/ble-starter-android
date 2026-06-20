@@ -72,12 +72,15 @@ class MainActivity : AppCompatActivity() {
     private var isScanning = false
         set(value) {
             field = value
-            runOnUiThread { binding.scanButton.text = if (value) "Stop Scan" else "Start Scan" }
+            runOnUiThread {
+                binding.scanButton.setText(if (value) R.string.stop_scan else R.string.start_scan)
+            }
         }
 
     private val scanResults = mutableListOf<ScanResult>()
     private val scanResultAdapter: ScanResultAdapter by lazy {
         ScanResultAdapter(scanResults) { result ->
+            showToast("Device selected")
             if (isScanning) {
                 stopBleScan()
             }
@@ -110,7 +113,11 @@ class MainActivity : AppCompatActivity() {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
-        binding.scanButton.setOnClickListener { if (isScanning) stopBleScan() else startBleScan() }
+        binding.scanButton.setOnClickListener {
+            showToast(if (isScanning) "Stop Scan pressed" else "Start Scan pressed")
+            if (isScanning) stopBleScan() else startBleScan()
+        }
+        binding.settingsButton.setOnClickListener { showToast("Settings pressed") }
         setupRecyclerView()
     }
 
@@ -218,6 +225,10 @@ class MainActivity : AppCompatActivity() {
             bleScanner.stopScan(scanCallback)
             isScanning = false
         }
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     @UiThread

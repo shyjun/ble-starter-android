@@ -16,7 +16,12 @@
   -->
 
 <resources>
-    <color name="colorPrimary">#00B0FF</color>
-    <color name="colorPrimaryDark">#0091EA</color>
-    <color name="colorAccent">#D81B60</color>
+    <color name="colorPrimary">#087CF0</color>
+    <color name="colorPrimaryDark">#0566CB</color>
+    <color name="colorAccent">#087CF0</color>
+    <color name="screenBackground">#FAFAFA</color>
+    <color name="textPrimary">#151515</color>
+    <color name="textSecondary">#666666</color>
+    <color name="connectedGreen">#00A31A</color>
+    <color name="rawDataGreen">#008A18</color>
 </resources>

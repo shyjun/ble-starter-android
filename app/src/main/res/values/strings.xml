@@ -15,7 +15,17 @@
   -->
 
 <resources>
-    <string name="app_name">BLE Starter</string>
+    <string name="app_name">Track Tail</string>
+    <string name="settings">Settings</string>
+    <string name="welcome_track_tail">Welcome to Track Tail</string>
+    <string name="scan_subtitle">Scan and connect to your tracker</string>
+    <string name="start_scan">⌕   Start Scan</string>
+    <string name="stop_scan">Stop Scan</string>
+    <string name="scan_results">Scan results (tap to connect)</string>
+    <string name="connected">●  CONNECTED</string>
+    <string name="main_tab">MAIN</string>
+    <string name="raw_data_tab">RAW DATA</string>
+    <string name="sample_raw_data">2026-06-20 09:31:15\n{\n  "device_id": "TRACKTAIL_01",\n  "seq": 1024,\n  "battery": 82,\n  "sensors": {\n    "heart_rate": 72,\n    "temperature": 37.1,\n    "acc_x": 0.12,\n    "acc_y": -0.03,\n    "acc_z": 9.81\n  },\n  "location": {\n    "lat": 12.9716,\n    "lon": 77.5946,\n    "alt": 900.5\n  }\n}\n\n--------------------------------\n\n2026-06-20 09:31:20\n{\n  "device_id": "TRACKTAIL_01",\n  "seq": 1025,\n  "battery": 82,\n  "sensors": {\n    "heart_rate": 73,\n    "temperature": 37.1,\n    "acc_x": 0.10,\n    "acc_y": -0.02,\n    "acc_z": 9.79\n  }\n}</string>
     <string name="ble_playground">BLE Playground</string>
     <string name="location_permission_required">Location Permission Required</string>
     <string name="location_permission_rationale">Starting from Android 6, the system requires apps to be granted location access in order to scan for BLE devices.\n\nYour location is never used aside from enabling the app to perform BLE scans.</string>
