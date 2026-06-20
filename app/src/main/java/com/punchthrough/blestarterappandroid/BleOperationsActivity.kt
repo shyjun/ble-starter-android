@@ -131,10 +131,12 @@ class BleOperationsActivity : AppCompatActivity() {
         configureRow(
             binding.updatedRow,
             "◷",
-            "Last Updated",
+            "Dummy",
             "09:31:25\nUTC",
-            "sensor_last_updated"
-        )
+            "sensor_dummy"
+        ) {
+            sendSensorRefresh("Dummy", "sensor_dummy")
+        }
     }
 
     private fun configureRow(
@@ -159,7 +161,12 @@ class BleOperationsActivity : AppCompatActivity() {
     private fun sendHeartRateRefresh() {
         Timber.i("Refresh button clicked: Heart Rate")
 
-        sendBleCommand("Heart Rate request", buildHeartRateRefreshCommand())
+        sendSensorRefresh("Heart Rate", "sensor_hr")
+    }
+
+    private fun sendSensorRefresh(label: String, sensorName: String) {
+        Timber.i("Refresh button clicked: $label")
+        sendBleCommand("$label request", buildSensorRefreshCommand(sensorName))
     }
 
     private fun sendBleCommand(label: String, command: String): Boolean {
@@ -211,11 +218,11 @@ class BleOperationsActivity : AppCompatActivity() {
         return true
     }
 
-    private fun buildHeartRateRefreshCommand(): String {
+    private fun buildSensorRefreshCommand(sensorName: String): String {
         return "GET_DATA_FROM_BLE:{" +
             " \"ID\": \"1\"," +
             " \"time\": ${System.currentTimeMillis()}," +
-            " \"action\": { \"msg_id\": 2, \"sensor\": \"sensor_hr\" }" +
+            " \"action\": { \"msg_id\": 2, \"sensor\": \"$sensorName\" }" +
             " }"
     }
 
@@ -247,7 +254,7 @@ class BleOperationsActivity : AppCompatActivity() {
         dialogBinding.sensorIcon.text = icon
         dialogBinding.dialogTitle.text = "$label Settings"
         dialogBinding.enabledDescription.text = "Enable or disable $label sensor updates."
-        dialogBinding.enabledSwitch.isChecked = currentSetting.enabled
+        dialogBinding.enabledSwitch.isChecked = true
         dialogBinding.intervalValue.text = selectedInterval.toString()
 
         dialogBinding.decreaseButton.setOnClickListener {
@@ -263,9 +270,7 @@ class BleOperationsActivity : AppCompatActivity() {
         dialogBinding.closeButton.setOnClickListener { dialog.dismiss() }
         dialogBinding.cancelButton.setOnClickListener { dialog.dismiss() }
         dialogBinding.okButton.setOnClickListener {
-            val enabled = dialogBinding.enabledSwitch.isChecked
-            val changed = enabled != currentSetting.enabled ||
-                selectedInterval != currentSetting.interval
+            val changed = selectedInterval != currentSetting.interval
             if (!changed) {
                 dialog.dismiss()
                 return@setOnClickListener
@@ -273,7 +278,6 @@ class BleOperationsActivity : AppCompatActivity() {
 
             val command = buildSensorSettingsCommand(sensorName, selectedInterval)
             if (sendBleCommand("$label settings", command)) {
-                currentSetting.enabled = enabled
                 currentSetting.interval = selectedInterval
                 dialog.dismiss()
             }
@@ -364,7 +368,6 @@ class BleOperationsActivity : AppCompatActivity() {
     }
 
     private data class SensorSetting(
-        var enabled: Boolean = true,
         var interval: Int = DEFAULT_INTERVAL_SECONDS
     )
 
