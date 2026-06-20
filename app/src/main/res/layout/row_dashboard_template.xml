@@ -36,6 +36,7 @@
     <TextView
         android:id="@+id/refresh_button"
         style="@style/TrackTailSquareAction"
+        android:contentDescription="@string/refresh_sensor"
         android:text="↻" />
 
     <TextView

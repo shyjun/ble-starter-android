@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 /** Maximum BLE MTU size as defined in gatt_api.h. */
 private const val GATT_MAX_MTU_SIZE = 517
 private const val GATT_MIN_MTU_SIZE = 23
+private const val BLE_WRITE_INITIATION_FAILED = -1
 
 @SuppressLint("MissingPermission") // Assume permissions are handled by UI
 object ConnectionManager {
@@ -114,7 +115,7 @@ object ConnectionManager {
         device: BluetoothDevice,
         characteristic: BluetoothGattCharacteristic,
         payload: ByteArray
-    ) {
+    ): Boolean {
         val writeType = when {
             characteristic.isWritable() -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             characteristic.isWritableWithoutResponse() -> {
@@ -122,13 +123,23 @@ object ConnectionManager {
             }
             else -> {
                 Timber.e("Characteristic ${characteristic.uuid} cannot be written to")
-                return
+                return false
             }
         }
-        if (device.isConnected()) {
-            enqueueOperation(CharacteristicWrite(device, characteristic.uuid, writeType, payload))
+        return if (device.isConnected()) {
+            enqueueOperation(
+                CharacteristicWrite(
+                    device = device,
+                    serviceUuid = characteristic.service?.uuid,
+                    characteristicUuid = characteristic.uuid,
+                    writeType = writeType,
+                    payload = payload
+                )
+            )
+            true
         } else {
             Timber.e("Not connected to ${device.address}, cannot perform characteristic write")
+            false
         }
     }
 
@@ -250,12 +261,32 @@ object ConnectionManager {
                 signalEndOfOperation()
             }
             is CharacteristicWrite -> with(operation) {
-                gatt.findCharacteristic(characteristicUuid)?.executeWrite(
-                    gatt,
-                    payload,
-                    writeType
-                ) ?: this@ConnectionManager.run {
-                    Timber.e("Cannot find $characteristicUuid to write to")
+                gatt.findCharacteristic(characteristicUuid, serviceUuid)?.let { characteristic ->
+                    val writeStarted = characteristic.executeWrite(gatt, payload, writeType)
+                    if (writeStarted) {
+                        Timber.i(
+                            "BLE write initiated: " +
+                                "service=$serviceUuid, characteristic=$characteristicUuid"
+                        )
+                    } else {
+                        Timber.e(
+                            "BLE write initiation failed immediately: " +
+                                "service=$serviceUuid, characteristic=$characteristicUuid"
+                        )
+                        listenersAsSet.forEach {
+                            it.get()?.onCharacteristicWriteFailed?.invoke(
+                                gatt.device,
+                                characteristic,
+                                BLE_WRITE_INITIATION_FAILED
+                            )
+                        }
+                        signalEndOfOperation()
+                    }
+                } ?: this@ConnectionManager.run {
+                    Timber.e(
+                        "Writable characteristic not found: " +
+                            "service=$serviceUuid, characteristic=$characteristicUuid"
+                    )
                     signalEndOfOperation()
                 }
             }
@@ -461,14 +492,38 @@ object ConnectionManager {
             with(characteristic) {
                 when (status) {
                     BluetoothGatt.GATT_SUCCESS -> {
-                        Timber.i("Wrote to characteristic $uuid | value: ${writtenValue?.toHexString()}")
-                        listenersAsSet.forEach { it.get()?.onCharacteristicWrite?.invoke(gatt.device, this) }
+                        Timber.i(
+                            "BLE write success callback: characteristic=$uuid | " +
+                                "value=${writtenValue?.toHexString()}"
+                        )
+                        listenersAsSet.forEach {
+                            it.get()?.onCharacteristicWrite?.invoke(gatt.device, this)
+                        }
                     }
                     BluetoothGatt.GATT_WRITE_NOT_PERMITTED -> {
-                        Timber.e("Write not permitted for $uuid!")
+                        Timber.e(
+                            "BLE write failure callback: write not permitted for $uuid, " +
+                                "status=$status"
+                        )
+                        listenersAsSet.forEach {
+                            it.get()?.onCharacteristicWriteFailed?.invoke(
+                                gatt.device,
+                                this,
+                                status
+                            )
+                        }
                     }
                     else -> {
-                        Timber.e("Characteristic write failed for $uuid, error: $status")
+                        Timber.e(
+                            "BLE write failure callback: characteristic=$uuid, status=$status"
+                        )
+                        listenersAsSet.forEach {
+                            it.get()?.onCharacteristicWriteFailed?.invoke(
+                                gatt.device,
+                                this,
+                                status
+                            )
+                        }
                     }
                 }
             }

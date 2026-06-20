@@ -65,6 +65,14 @@ class ConnectionEventListener {
         ) -> Unit
     )? = null
 
+    var onCharacteristicWriteFailed: (
+        (
+            device: BluetoothDevice,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int
+        ) -> Unit
+    )? = null
+
     var onNotificationsEnabled: (
         (
             device: BluetoothDevice,

@@ -2,6 +2,7 @@ package com.punchthrough.blestarterappandroid
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGattCharacteristic
 import android.graphics.Color
 import android.os.Bundle
 import android.view.View
@@ -14,6 +15,14 @@ import com.punchthrough.blestarterappandroid.ble.ConnectionEventListener
 import com.punchthrough.blestarterappandroid.ble.ConnectionManager
 import com.punchthrough.blestarterappandroid.ble.ConnectionManager.parcelableExtraCompat
 import com.punchthrough.blestarterappandroid.databinding.ActivityBleOperationsBinding
+import com.punchthrough.blestarterappandroid.databinding.RowDashboardTemplateBinding
+import timber.log.Timber
+import java.util.UUID
+
+private val TRACK_TAIL_SERVICE_UUID: UUID =
+    UUID.fromString("78563412-7856-3412-5678-123412345678")
+private val TRACK_TAIL_WRITE_CHARACTERISTIC_UUID: UUID =
+    UUID.fromString("78563412-7856-3412-5678-123412345680")
 
 class BleOperationsActivity : AppCompatActivity() {
 
@@ -64,27 +73,103 @@ class BleOperationsActivity : AppCompatActivity() {
     }
 
     private fun setupDashboardRows() {
-        configureRow(R.id.heart_rate_row, "♡", "Heart Rate", "72\nBPM")
-        configureRow(R.id.steps_row, "♧", "Step Count", "1250\nsteps")
-        configureRow(R.id.temperature_row, "♨", "Temperature", "37.1\n°C")
-        configureRow(R.id.battery_row, "▯", "Battery Level", "82\n%")
-        configureRow(R.id.accelerometer_row, "⌁", "Accelerometer", "0.12\n-0.03, 9.81")
-        configureRow(R.id.gps_row, "⌖", "GPS Location", "12.9716\n77.5946")
-        configureRow(R.id.wifi_row, "≋", "WiFi RSSI", "-56\ndBm")
-        configureRow(R.id.updated_row, "◷", "Last Updated", "09:31:25\nUTC")
+        configureRow(binding.heartRateRow, "♡", "Heart Rate", "72\nBPM") {
+            sendHeartRateRefresh()
+        }
+        configureRow(binding.stepsRow, "♧", "Step Count", "1250\nsteps")
+        configureRow(binding.temperatureRow, "♨", "Temperature", "37.1\n°C")
+        configureRow(binding.batteryRow, "▯", "Battery Level", "82\n%")
+        configureRow(
+            binding.accelerometerRow,
+            "⌁",
+            "Accelerometer",
+            "0.12\n-0.03, 9.81"
+        )
+        configureRow(binding.gpsRow, "⌖", "GPS Location", "12.9716\n77.5946")
+        configureRow(binding.wifiRow, "≋", "WiFi RSSI", "-56\ndBm")
+        configureRow(binding.updatedRow, "◷", "Last Updated", "09:31:25\nUTC")
     }
 
-    private fun configureRow(rowId: Int, icon: String, label: String, value: String) {
-        val row = findViewById<View>(rowId)
-        row.findViewById<TextView>(R.id.metric_icon).text = icon
-        row.findViewById<TextView>(R.id.metric_name).text = label
-        row.findViewById<TextView>(R.id.metric_value).text = value
-        row.findViewById<View>(R.id.refresh_button).setOnClickListener {
-            toast("$label refresh pressed")
+    private fun configureRow(
+        row: RowDashboardTemplateBinding,
+        icon: String,
+        label: String,
+        value: String,
+        onRefresh: (() -> Unit)? = null
+    ) {
+        row.metricIcon.text = icon
+        row.metricName.text = label
+        row.metricValue.text = value
+        row.refreshButton.setOnClickListener {
+            onRefresh?.invoke() ?: toast("$label refresh pressed")
         }
-        row.findViewById<View>(R.id.metric_settings_button).setOnClickListener {
+        row.metricSettingsButton.setOnClickListener {
             toast("$label settings pressed")
         }
+    }
+
+    private fun sendHeartRateRefresh() {
+        Timber.i("Refresh button clicked: Heart Rate")
+
+        val json = buildHeartRateRefreshJson()
+        Timber.i("JSON payload generated: $json")
+
+        val service = ConnectionManager.servicesOnDevice(device)
+            ?.firstOrNull { it.uuid == TRACK_TAIL_SERVICE_UUID }
+        if (service == null) {
+            Timber.e("Service not found: $TRACK_TAIL_SERVICE_UUID")
+            toast("Heart Rate request failed: BLE service not found")
+            return
+        }
+        Timber.i("Service found: ${service.uuid}")
+
+        val characteristic = service.getCharacteristic(TRACK_TAIL_WRITE_CHARACTERISTIC_UUID)
+        if (characteristic == null) {
+            Timber.e(
+                "Characteristic not found: service=$TRACK_TAIL_SERVICE_UUID, " +
+                    "characteristic=$TRACK_TAIL_WRITE_CHARACTERISTIC_UUID"
+            )
+            toast("Heart Rate request failed: writable characteristic not found")
+            return
+        }
+        Timber.i("Characteristic found: ${characteristic.uuid}")
+
+        if (!isWriteWithResponseSupported(characteristic)) {
+            Timber.e(
+                "Characteristic ${characteristic.uuid} does not support WRITE_TYPE_DEFAULT"
+            )
+            toast("Heart Rate request failed: characteristic is not writable")
+            return
+        }
+
+        Timber.i("Submitting BLE write to existing ConnectionManager queue")
+        val queued = ConnectionManager.writeCharacteristic(
+            device,
+            characteristic,
+            json.toByteArray(Charsets.UTF_8)
+        )
+        toast(
+            if (queued) {
+                "Heart Rate request queued"
+            } else {
+                "Heart Rate request failed: BLE is not connected"
+            }
+        )
+    }
+
+    private fun buildHeartRateRefreshJson(): String {
+        return "GET_DATA_FROM_BLE:{" +
+            " \"ID\": \"1\"," +
+            " \"time\": ${System.currentTimeMillis()}," +
+            " \"action\": { \"msg_id\": 2, \"sensor\": \"sensor_hr\" }" +
+            " }"
+    }
+
+    private fun isWriteWithResponseSupported(
+        characteristic: BluetoothGattCharacteristic
+    ): Boolean {
+        return characteristic.properties and
+            BluetoothGattCharacteristic.PROPERTY_WRITE != 0
     }
 
     private fun showMainTab(showToast: Boolean) {
@@ -122,6 +207,32 @@ class BleOperationsActivity : AppCompatActivity() {
                             .setMessage("Disconnected from device.")
                             .setPositiveButton(R.string.ok) { _, _ -> finish() }
                             .show()
+                    }
+                }
+            }
+            onCharacteristicWrite = { callbackDevice, characteristic ->
+                if (callbackDevice == device &&
+                    characteristic.uuid == TRACK_TAIL_WRITE_CHARACTERISTIC_UUID
+                ) {
+                    Timber.i(
+                        "BLE write success callback received for Heart Rate refresh: " +
+                            characteristic.uuid
+                    )
+                    runOnUiThread {
+                        toast("Heart Rate request sent successfully")
+                    }
+                }
+            }
+            onCharacteristicWriteFailed = { callbackDevice, characteristic, status ->
+                if (callbackDevice == device &&
+                    characteristic.uuid == TRACK_TAIL_WRITE_CHARACTERISTIC_UUID
+                ) {
+                    Timber.e(
+                        "BLE write failure callback received for Heart Rate refresh: " +
+                            "characteristic=${characteristic.uuid}, status=$status"
+                    )
+                    runOnUiThread {
+                        toast("Heart Rate request failed (BLE status $status)")
                     }
                 }
             }

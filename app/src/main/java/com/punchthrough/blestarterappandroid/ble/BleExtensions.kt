@@ -139,12 +139,13 @@ fun BluetoothGattCharacteristic.executeWrite(
     gatt: BluetoothGatt,
     payload: ByteArray,
     writeType: Int
-) {
+): Boolean {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        gatt.writeCharacteristic(this, payload, writeType)
+        return gatt.writeCharacteristic(this, payload, writeType) ==
+            android.bluetooth.BluetoothStatusCodes.SUCCESS
     } else {
         // Fall back to deprecated version of writeCharacteristic for Android <13
-        legacyCharacteristicWrite(gatt, payload, writeType)
+        return legacyCharacteristicWrite(gatt, payload, writeType)
     }
 }
 
@@ -155,10 +156,10 @@ private fun BluetoothGattCharacteristic.legacyCharacteristicWrite(
     gatt: BluetoothGatt,
     payload: ByteArray,
     writeType: Int
-) {
+): Boolean {
     this.writeType = writeType
     value = payload
-    gatt.writeCharacteristic(this)
+    return gatt.writeCharacteristic(this)
 }
 
 // BluetoothGattDescriptor

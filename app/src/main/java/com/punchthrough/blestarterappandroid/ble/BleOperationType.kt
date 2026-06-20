@@ -31,9 +31,13 @@ data class Connect(override val device: BluetoothDevice, val context: Context) :
 /** Disconnect from [device] and release all connection resources. */
 data class Disconnect(override val device: BluetoothDevice) : BleOperationType()
 
-/** Write [payload] as the value of a characteristic represented by [characteristicUuid]. */
+/**
+ * Write [payload] to [characteristicUuid] within [serviceUuid].
+ * The service UUID prevents collisions when services expose characteristics with the same UUID.
+ */
 data class CharacteristicWrite(
     override val device: BluetoothDevice,
+    val serviceUuid: UUID?,
     val characteristicUuid: UUID,
     val writeType: Int,
     val payload: ByteArray
@@ -45,6 +49,7 @@ data class CharacteristicWrite(
         other as CharacteristicWrite
 
         if (device != other.device) return false
+        if (serviceUuid != other.serviceUuid) return false
         if (characteristicUuid != other.characteristicUuid) return false
         if (writeType != other.writeType) return false
         if (!payload.contentEquals(other.payload)) return false
@@ -54,6 +59,7 @@ data class CharacteristicWrite(
 
     override fun hashCode(): Int {
         var result = device.hashCode()
+        result = 31 * result + (serviceUuid?.hashCode() ?: 0)
         result = 31 * result + characteristicUuid.hashCode()
         result = 31 * result + writeType
         result = 31 * result + payload.contentHashCode()
