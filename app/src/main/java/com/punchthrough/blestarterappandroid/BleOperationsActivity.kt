@@ -52,6 +52,7 @@ class BleOperationsActivity : AppCompatActivity() {
         setupDashboardRows()
         setupActions()
         subscribeToNotifications()
+        sendTimeSyncCmd()
         showMainTab(showToast = false)
     }
 
@@ -251,6 +252,13 @@ class BleOperationsActivity : AppCompatActivity() {
         Timber.i("Refresh button clicked: Heart Rate")
 
         sendSensorRefresh("Heart Rate", "sensor_hr")
+    }
+
+    private fun sendTimeSyncCmd() {
+        val ts = System.currentTimeMillis()
+        val unixSeconds = ts / 1000
+        val command = "GET_DATA_FROM_BLE:{\"ID\":\"1\",\"time\":$ts,\"action\":{\"msg_id\":5,\"time\":$unixSeconds}}"
+        sendBleCommand("Time sync", command)
     }
 
     private fun sendSensorRefresh(label: String, sensorName: String) {
