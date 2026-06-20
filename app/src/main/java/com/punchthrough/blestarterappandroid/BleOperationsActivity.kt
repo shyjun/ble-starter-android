@@ -122,7 +122,7 @@ class BleOperationsActivity : AppCompatActivity() {
         val line = payload.trimEnd('\r', '\n')
         if (line.isEmpty()) return
 
-        updateDummyValue(line)
+        updateSensorValues(line)
         val currentText = binding.rawDataText.text
         binding.rawDataText.text = if (currentText.isNullOrEmpty()) {
             line
@@ -134,19 +134,33 @@ class BleOperationsActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateDummyValue(payload: String) {
+    private fun updateSensorValues(payload: String) {
         try {
-            val dummyData = JSONObject(payload).optJSONObject("sensor_dummy_data") ?: return
-            if (dummyData.optString("name") != "sensor_dummy" || !dummyData.has("val")) {
-                return
-            }
-
-            val value = dummyData.get("val").toString()
-            binding.updatedRow.metricValue.text = value
-            Timber.i("Dummy sensor value updated: $value")
+            val json = JSONObject(payload)
+            updateDummyValue(json)
+            updateGpsValue(json)
         } catch (exception: JSONException) {
             Timber.w(exception, "Notification payload is not valid JSON")
         }
+    }
+
+    private fun updateDummyValue(json: JSONObject) {
+        val dummyData = json.optJSONObject("sensor_dummy_data") ?: return
+        if (dummyData.optString("name") == "sensor_dummy" && dummyData.has("val")) {
+            val value = dummyData.get("val").toString()
+            binding.updatedRow.metricValue.text = value
+            Timber.i("Dummy sensor value updated: $value")
+        }
+    }
+
+    private fun updateGpsValue(json: JSONObject) {
+        val gps = json.optJSONObject("gps") ?: return
+        val latitude = gps.optString("lat")
+        val longitude = gps.optString("lon")
+        if (latitude.isEmpty() || longitude.isEmpty()) return
+
+        binding.gpsRow.metricValue.text = "$latitude\n$longitude"
+        Timber.i("GPS location updated: lat=$latitude, lon=$longitude")
     }
 
     private fun setupDashboardRows() {
