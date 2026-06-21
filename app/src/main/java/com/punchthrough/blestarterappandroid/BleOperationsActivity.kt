@@ -79,7 +79,7 @@ class BleOperationsActivity : AppCompatActivity() {
         binding.settingsButton.setOnClickListener { toast("Settings pressed") }
         binding.mainTab.setOnClickListener { showMainTab(showToast = true) }
         binding.rawDataTab.setOnClickListener { showRawDataTab() }
-        binding.clearButton.setOnClickListener { toast("Clear pressed") }
+        binding.clearButton.setOnClickListener { binding.rawDataText.text = "" }
         binding.pauseButton.setOnClickListener { toast("Pause pressed") }
         binding.saveLogButton.setOnClickListener { toast("Save Log pressed") }
     }
