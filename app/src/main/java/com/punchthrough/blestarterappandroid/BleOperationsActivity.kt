@@ -212,18 +212,18 @@ class BleOperationsActivity : AppCompatActivity() {
             sendSensorRefresh("GPS Location", "sensor_gps")
         }
         configureRow(
-            binding.wifiRow,
-            "≋",
-            "WiFi RSSI",
-            "?\ndBm",
-            "sensor_wifi"
-        )
-        configureRow(
             binding.updatedRow,
             "◷",
             "Dummy",
             "--",
             "sensor_dummy"
+        ) 
+        configureRow(
+            binding.wifiRow,
+            "≋",
+            "Dummy_2",
+            "?\ndBm",
+            "sensor_dummy_2"
         ) {
             sendSensorRefresh("Dummy", "sensor_dummy")
         }
@@ -323,6 +323,17 @@ class BleOperationsActivity : AppCompatActivity() {
             " }"
     }
 
+    private fun buildSensorEnableCommand(sensorName: String, msgId: Int): String {
+        return "GET_DATA_FROM_BLE:{" +
+            " \"ID\": \"1\"," +
+            " \"time\": ${System.currentTimeMillis()}," +
+            " \"action\": {" +
+            " \"msg_id\": $msgId," +
+            " \"sensor\": \"$sensorName\"" +
+            " }" +
+            " }"
+    }
+
     private fun buildSensorSettingsCommand(sensorName: String, interval: Int): String {
         return "GET_DATA_FROM_BLE:{" +
             " \"ID\": \"1\"," +
@@ -351,7 +362,7 @@ class BleOperationsActivity : AppCompatActivity() {
         dialogBinding.sensorIcon.text = icon
         dialogBinding.dialogTitle.text = "$label Settings"
         dialogBinding.enabledDescription.text = "Enable or disable $label sensor updates."
-        dialogBinding.enabledSwitch.isChecked = true
+        dialogBinding.enabledSwitch.isChecked = currentSetting.enabled
         dialogBinding.intervalValue.text = selectedInterval.toString()
 
         dialogBinding.decreaseButton.setOnClickListener {
@@ -367,17 +378,28 @@ class BleOperationsActivity : AppCompatActivity() {
         dialogBinding.closeButton.setOnClickListener { dialog.dismiss() }
         dialogBinding.cancelButton.setOnClickListener { dialog.dismiss() }
         dialogBinding.okButton.setOnClickListener {
-            val changed = selectedInterval != currentSetting.interval
-            if (!changed) {
+            val intervalChanged = selectedInterval != currentSetting.interval
+            val enabledChanged = dialogBinding.enabledSwitch.isChecked != currentSetting.enabled
+
+            if (!intervalChanged && !enabledChanged) {
                 dialog.dismiss()
                 return@setOnClickListener
             }
 
-            val command = buildSensorSettingsCommand(sensorName, selectedInterval)
-            if (sendBleCommand("$label settings", command)) {
-                currentSetting.interval = selectedInterval
-                dialog.dismiss()
+            if (enabledChanged) {
+                val msgId = if (dialogBinding.enabledSwitch.isChecked) 3 else 4
+                val command = buildSensorEnableCommand(sensorName, msgId)
+                sendBleCommand("$label ${if (msgId == 3) "enable" else "disable"}", command)
             }
+
+            if (intervalChanged) {
+                val command = buildSensorSettingsCommand(sensorName, selectedInterval)
+                sendBleCommand("$label settings", command)
+            }
+
+            currentSetting.interval = selectedInterval
+            currentSetting.enabled = dialogBinding.enabledSwitch.isChecked
+            dialog.dismiss()
         }
 
         dialog.setOnShowListener {
@@ -487,7 +509,8 @@ class BleOperationsActivity : AppCompatActivity() {
     }
 
     private data class SensorSetting(
-        var interval: Int = DEFAULT_INTERVAL_SECONDS
+        var interval: Int = DEFAULT_INTERVAL_SECONDS,
+        var enabled: Boolean = true
     )
 
     private data class PendingWrite(val label: String)
