@@ -16,6 +16,7 @@ import com.punchthrough.blestarterappandroid.ble.ConnectionManager
 import com.punchthrough.blestarterappandroid.ble.ConnectionManager.parcelableExtraCompat
 import com.punchthrough.blestarterappandroid.databinding.ActivityBleOperationsBinding
 import com.punchthrough.blestarterappandroid.databinding.DialogSensorSettingsBinding
+import com.punchthrough.blestarterappandroid.databinding.DialogSystemSettingsBinding
 import com.punchthrough.blestarterappandroid.databinding.RowDashboardTemplateBinding
 import org.json.JSONException
 import org.json.JSONObject
@@ -37,6 +38,7 @@ class BleOperationsActivity : AppCompatActivity() {
     private lateinit var binding: ActivityBleOperationsBinding
     private val sensorSettings = mutableMapOf<String, SensorSetting>()
     private val pendingWrites = ConcurrentLinkedQueue<PendingWrite>()
+    private var publishIntervalSeconds = DEFAULT_INTERVAL_SECONDS
     private val device: BluetoothDevice by lazy {
         intent.parcelableExtraCompat(BluetoothDevice.EXTRA_DEVICE)
             ?: error("Missing BluetoothDevice from MainActivity")
@@ -78,7 +80,7 @@ class BleOperationsActivity : AppCompatActivity() {
     }
 
     private fun setupActions() {
-        binding.settingsButton.setOnClickListener { toast("Settings pressed") }
+        binding.settingsButton.setOnClickListener { showSystemSettingsDialog() }
         binding.mainTab.setOnClickListener { showMainTab(showToast = true) }
         binding.rawDataTab.setOnClickListener { showRawDataTab() }
         binding.clearButton.setOnClickListener { binding.rawDataText.text = "" }
@@ -359,6 +361,55 @@ class BleOperationsActivity : AppCompatActivity() {
             " \"interval\": $interval" +
             " }" +
             " }"
+    }
+
+    private fun buildSystemSettingsCommand(interval: Int): String {
+        return "GET_DATA_FROM_BLE:{" +
+            " \"ID\": \"1\"," +
+            " \"time\": ${System.currentTimeMillis()}," +
+            " \"action\": {" +
+            " \"msg_id\": 6," +
+            " \"publish_interval\": $interval" +
+            " }" +
+            " }"
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun showSystemSettingsDialog() {
+        var selectedInterval = publishIntervalSeconds
+        val dialogBinding = DialogSystemSettingsBinding.inflate(layoutInflater)
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogBinding.root)
+            .create()
+
+        dialogBinding.intervalValue.text = selectedInterval.toString()
+        dialogBinding.decreaseButton.setOnClickListener {
+            selectedInterval = (selectedInterval - INTERVAL_STEP_SECONDS)
+                .coerceAtLeast(MIN_INTERVAL_SECONDS)
+            dialogBinding.intervalValue.text = selectedInterval.toString()
+        }
+        dialogBinding.increaseButton.setOnClickListener {
+            selectedInterval = (selectedInterval + INTERVAL_STEP_SECONDS)
+                .coerceAtMost(MAX_INTERVAL_SECONDS)
+            dialogBinding.intervalValue.text = selectedInterval.toString()
+        }
+        dialogBinding.closeButton.setOnClickListener { dialog.dismiss() }
+        dialogBinding.cancelButton.setOnClickListener { dialog.dismiss() }
+        dialogBinding.okButton.setOnClickListener {
+            val command = buildSystemSettingsCommand(selectedInterval)
+            if (sendBleCommand("System settings", command)) {
+                publishIntervalSeconds = selectedInterval
+                dialog.dismiss()
+            }
+        }
+
+        dialog.setOnShowListener {
+            dialog.window?.setLayout(
+                (resources.displayMetrics.widthPixels * DIALOG_WIDTH_RATIO).toInt(),
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+        dialog.show()
     }
 
     @SuppressLint("SetTextI18n")

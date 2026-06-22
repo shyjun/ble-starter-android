@@ -33,6 +33,9 @@
     <string name="decrease_interval">Decrease interval</string>
     <string name="increase_interval">Increase interval</string>
     <string name="cancel">CANCEL</string>
+    <string name="system_settings">System Settings</string>
+    <string name="publish_interval">Publish Interval (secs)</string>
+    <string name="publish_interval_description">Interval between sensor data publishes from the device.</string>
     <string name="sample_raw_data">2026-06-20 09:31:15\n{\n  "device_id": "TRACKTAIL_01",\n  "seq": 1024,\n  "battery": 82,\n  "sensors": {\n    "heart_rate": 72,\n    "temperature": 37.1,\n    "acc_x": 0.12,\n    "acc_y": -0.03,\n    "acc_z": 9.81\n  },\n  "location": {\n    "lat": 12.9716,\n    "lon": 77.5946,\n    "alt": 900.5\n  }\n}\n\n--------------------------------\n\n2026-06-20 09:31:20\n{\n  "device_id": "TRACKTAIL_01",\n  "seq": 1025,\n  "battery": 82,\n  "sensors": {\n    "heart_rate": 73,\n    "temperature": 37.1,\n    "acc_x": 0.10,\n    "acc_y": -0.02,\n    "acc_z": 9.79\n  }\n}</string>
     <string name="ble_playground">BLE Playground</string>
     <string name="location_permission_required">Location Permission Required</string>
