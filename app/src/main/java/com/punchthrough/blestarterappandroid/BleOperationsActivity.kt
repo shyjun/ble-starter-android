@@ -230,7 +230,9 @@ class BleOperationsActivity : AppCompatActivity() {
             "Dummy",
             "--",
             "sensor_dummy"
-        ) 
+        ) {
+            sendSensorRefresh("Dummy", "sensor_dummy")
+        }
         configureRow(
             binding.wifiRow,
             "≋",
@@ -238,7 +240,7 @@ class BleOperationsActivity : AppCompatActivity() {
             "?\ndBm",
             "sensor_dummy_2"
         ) {
-            sendSensorRefresh("Dummy", "sensor_dummy")
+            sendSensorRefresh("Dummy_2", "sensor_dummy_2")
         }
     }
 
