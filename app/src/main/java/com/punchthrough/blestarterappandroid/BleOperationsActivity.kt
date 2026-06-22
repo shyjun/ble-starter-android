@@ -48,6 +48,7 @@ class BleOperationsActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         ConnectionManager.registerListener(connectionEventListener)
+        MqttManager.connect()
         showDeviceDetails()
         setupDashboardRows()
         setupActions()
@@ -57,6 +58,7 @@ class BleOperationsActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        MqttManager.disconnect()
         ConnectionManager.unregisterListener(connectionEventListener)
         if (isFinishing) {
             ConnectionManager.teardownConnection(device)
@@ -124,6 +126,7 @@ class BleOperationsActivity : AppCompatActivity() {
         if (line.isEmpty()) return
 
         updateSensorValues(line)
+        MqttManager.publish("tracktrail/AABBCCDDEEFF/sensor_data", line)
         val currentText = binding.rawDataText.text
         binding.rawDataText.text = if (currentText.isNullOrEmpty()) {
             line
