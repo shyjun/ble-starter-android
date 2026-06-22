@@ -139,6 +139,7 @@ class BleOperationsActivity : AppCompatActivity() {
         try {
             val json = JSONObject(payload)
             updateDummyValue(json)
+            updateDummy2Value(json)
             updateGpsValue(json)
         } catch (exception: JSONException) {
             Timber.w(exception, "Notification payload is not valid JSON")
@@ -151,6 +152,15 @@ class BleOperationsActivity : AppCompatActivity() {
             val value = dummyData.get("val").toString()
             binding.updatedRow.metricValue.text = value
             Timber.i("Dummy sensor value updated: $value")
+        }
+    }
+
+    private fun updateDummy2Value(json: JSONObject) {
+        val dummyData = json.optJSONObject("sensor_dummy_2_data") ?: return
+        if (dummyData.optString("name") == "sensor_dummy_2" && dummyData.has("val")) {
+            val value = dummyData.get("val").toString()
+            binding.wifiRow.metricValue.text = value
+            Timber.i("Dummy_2 sensor value updated: $value")
         }
     }
 
