@@ -308,9 +308,9 @@ class BleOperationsActivity : AppCompatActivity() {
     private fun sendBleCommand(label: String, command: String): Boolean {
         Timber.i("JSON payload generated: $command")
         if (isCloudMode) {
-            Timber.w("$label ignored because BLE is unavailable in cloud mode")
-            toast("$label unavailable in cloud mode")
-            return false
+            val jsonPayload = command.removePrefix("GET_DATA_FROM_BLE:")
+            MqttManager.publish("tracktrail/AABBCCDDEEFF/config_data", jsonPayload)
+            return true
         }
 
         val service = ConnectionManager.servicesOnDevice(device)
