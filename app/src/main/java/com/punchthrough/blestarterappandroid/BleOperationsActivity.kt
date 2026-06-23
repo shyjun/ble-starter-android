@@ -65,8 +65,10 @@ class BleOperationsActivity : AppCompatActivity() {
                 }
             }
         }
-        MqttManager.subscribe("tracktrail/+/sensor_data")
         MqttManager.subscribe("tracktrail/+/config_data")
+        if (isCloudMode) {
+            MqttManager.subscribe("tracktrail/+/sensor_data")
+        }
         showDeviceDetails()
         setupDashboardRows()
         setupActions()
