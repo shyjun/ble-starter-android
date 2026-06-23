@@ -192,6 +192,7 @@ class BleOperationsActivity : AppCompatActivity() {
         try {
             val json = JSONObject(payload)
             val settings = json.optJSONObject("settings") ?: return
+            publishIntervalSeconds = settings.optInt("publish_interval", publishIntervalSeconds)
             val sensors = settings.optJSONObject("sensors") ?: return
             for (key in sensors.keys()) {
                 val config = sensors.getJSONObject(key)
