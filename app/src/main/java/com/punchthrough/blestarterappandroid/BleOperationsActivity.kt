@@ -39,6 +39,7 @@ class BleOperationsActivity : AppCompatActivity() {
     private val sensorSettings = mutableMapOf<String, SensorSetting>()
     private val pendingWrites = ConcurrentLinkedQueue<PendingWrite>()
     private var publishIntervalSeconds = DEFAULT_INTERVAL_SECONDS
+    private var lastPublishedConfigStr: String? = null
     private val isCloudMode by lazy {
         intent.getBooleanExtra(EXTRA_CLOUD_MODE, false)
     }
@@ -160,6 +161,11 @@ class BleOperationsActivity : AppCompatActivity() {
         val line = payload.trimEnd('\r', '\n')
         if (line.isEmpty()) return
 
+        if (line.contains("\"config_str\"")) {
+            handleConfigStrFromBle(line)
+            return
+        }
+
         updateSensorValues(line)
         if (!isCloudMode) {
             MqttManager.publish("tracktrail/AABBCCDDEEFF/sensor_data", line)
@@ -175,14 +181,50 @@ class BleOperationsActivity : AppCompatActivity() {
         }
     }
 
+    private fun handleConfigStrFromBle(payload: String) {
+        applyConfigStrSettings(payload)
+        MqttManager.publish("tracktrail/AABBCCDDEEFF/config_data", payload)
+        lastPublishedConfigStr = payload
+        appendToRawConfText(payload)
+    }
+
+    private fun applyConfigStrSettings(payload: String) {
+        try {
+            val json = JSONObject(payload)
+            val settings = json.optJSONObject("settings") ?: return
+            val sensors = settings.optJSONObject("sensors") ?: return
+            for (key in sensors.keys()) {
+                val config = sensors.getJSONObject(key)
+                sensorSettings[key] = SensorSetting(
+                    interval = config.optInt("interval", DEFAULT_INTERVAL_SECONDS),
+                    enabled = config.optBoolean("enabled", true)
+                )
+            }
+        } catch (e: JSONException) {
+            Timber.w(e, "Failed to parse config_str settings")
+        }
+    }
+
     private fun appendRawConfNotification(payload: String) {
         val line = payload.trimEnd('\r', '\n')
         if (line.isEmpty()) return
 
+        if (line.contains("\"config_str\"")) {
+            applyConfigStrSettings(line)
+            if (!isCloudMode && line == lastPublishedConfigStr) {
+                lastPublishedConfigStr = null
+                appendToRawConfText(line)
+                return
+            }
+        }
+
         if (!isCloudMode) {
             sendBleCommand("Config forward", "GET_DATA_FROM_BLE:$line")
         }
+        appendToRawConfText(line)
+    }
 
+    private fun appendToRawConfText(line: String) {
         val currentText = binding.rawConfDataText.text
         binding.rawConfDataText.text = if (currentText.isNullOrEmpty()) {
             line
@@ -197,7 +239,7 @@ class BleOperationsActivity : AppCompatActivity() {
     private fun updateSensorValues(payload: String) {
         try {
             val json = JSONObject(payload)
-            if (json.optString("ID") != "sensor_data") return
+            if (json.optString("type") != "sensor_data") return
             updateDummyValue(json)
             updateDummy2Value(json)
             updateGpsValue(json)
