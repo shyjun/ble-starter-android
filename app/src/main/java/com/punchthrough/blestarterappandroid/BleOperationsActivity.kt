@@ -57,9 +57,16 @@ class BleOperationsActivity : AppCompatActivity() {
         }
         MqttManager.connect()
         MqttManager.onMessageReceived = { topic, payload ->
-            runOnUiThread { appendRawNotification(payload) }
+            runOnUiThread {
+                if (topic.endsWith("/sensor_data")) {
+                    appendRawNotification(payload)
+                } else if (topic.endsWith("/config_data")) {
+                    appendRawConfNotification(payload)
+                }
+            }
         }
         MqttManager.subscribe("tracktrail/+/sensor_data")
+        MqttManager.subscribe("tracktrail/+/config_data")
         showDeviceDetails()
         setupDashboardRows()
         setupActions()
@@ -163,6 +170,21 @@ class BleOperationsActivity : AppCompatActivity() {
         }
         binding.rawDataScrollView.post {
             binding.rawDataScrollView.fullScroll(View.FOCUS_DOWN)
+        }
+    }
+
+    private fun appendRawConfNotification(payload: String) {
+        val line = payload.trimEnd('\r', '\n')
+        if (line.isEmpty()) return
+
+        val currentText = binding.rawConfDataText.text
+        binding.rawConfDataText.text = if (currentText.isNullOrEmpty()) {
+            line
+        } else {
+            "$currentText\n$line"
+        }
+        binding.rawConfDataScrollView.post {
+            binding.rawConfDataScrollView.fullScroll(View.FOCUS_DOWN)
         }
     }
 
