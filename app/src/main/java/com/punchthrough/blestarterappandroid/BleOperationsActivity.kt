@@ -197,6 +197,7 @@ class BleOperationsActivity : AppCompatActivity() {
     private fun updateSensorValues(payload: String) {
         try {
             val json = JSONObject(payload)
+            if (json.optString("ID") != "sensor_data") return
             updateDummyValue(json)
             updateDummy2Value(json)
             updateGpsValue(json)
