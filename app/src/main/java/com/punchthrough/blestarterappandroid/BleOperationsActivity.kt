@@ -177,6 +177,10 @@ class BleOperationsActivity : AppCompatActivity() {
         val line = payload.trimEnd('\r', '\n')
         if (line.isEmpty()) return
 
+        if (!isCloudMode) {
+            sendBleCommand("Config forward", "GET_DATA_FROM_BLE:$line")
+        }
+
         val currentText = binding.rawConfDataText.text
         binding.rawConfDataText.text = if (currentText.isNullOrEmpty()) {
             line
