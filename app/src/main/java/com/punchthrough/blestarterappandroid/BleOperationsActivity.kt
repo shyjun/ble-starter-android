@@ -103,9 +103,13 @@ class BleOperationsActivity : AppCompatActivity() {
         binding.settingsButton.setOnClickListener { showSystemSettingsDialog() }
         binding.mainTab.setOnClickListener { showMainTab(showToast = true) }
         binding.rawDataTab.setOnClickListener { showRawDataTab() }
+        binding.rawConfDataTab.setOnClickListener { showRawConfDataTab() }
         binding.clearButton.setOnClickListener { binding.rawDataText.text = "" }
         binding.pauseButton.setOnClickListener { toast("Pause pressed") }
         binding.saveLogButton.setOnClickListener { toast("Save Log pressed") }
+        binding.confClearButton.setOnClickListener { binding.rawConfDataText.text = "" }
+        binding.confPauseButton.setOnClickListener { toast("Conf Pause pressed") }
+        binding.confSaveLogButton.setOnClickListener { toast("Conf Save Log pressed") }
     }
 
     private fun subscribeToNotifications() {
@@ -515,20 +519,31 @@ class BleOperationsActivity : AppCompatActivity() {
     private fun showMainTab(showToast: Boolean) {
         binding.mainContent.visibility = View.VISIBLE
         binding.rawDataContent.visibility = View.GONE
-        selectTab(binding.mainTab, binding.rawDataTab)
+        binding.rawConfDataContent.visibility = View.GONE
+        selectTab(binding.mainTab, binding.rawDataTab, binding.rawConfDataTab)
     }
 
     private fun showRawDataTab() {
         binding.mainContent.visibility = View.GONE
         binding.rawDataContent.visibility = View.VISIBLE
-        selectTab(binding.rawDataTab, binding.mainTab)
+        binding.rawConfDataContent.visibility = View.GONE
+        selectTab(binding.rawDataTab, binding.mainTab, binding.rawConfDataTab)
     }
 
-    private fun selectTab(selected: TextView, unselected: TextView) {
+    private fun showRawConfDataTab() {
+        binding.mainContent.visibility = View.GONE
+        binding.rawDataContent.visibility = View.GONE
+        binding.rawConfDataContent.visibility = View.VISIBLE
+        selectTab(binding.rawConfDataTab, binding.mainTab, binding.rawDataTab)
+    }
+
+    private fun selectTab(selected: TextView, vararg others: TextView) {
         selected.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary))
         selected.setBackgroundResource(R.drawable.bg_tab_selected)
-        unselected.setTextColor(ContextCompat.getColor(this, R.color.textSecondary))
-        unselected.setBackgroundColor(Color.TRANSPARENT)
+        for (tab in others) {
+            tab.setTextColor(ContextCompat.getColor(this, R.color.textSecondary))
+            tab.setBackgroundColor(Color.TRANSPARENT)
+        }
     }
 
     private fun toast(message: String) {

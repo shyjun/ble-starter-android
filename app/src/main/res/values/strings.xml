@@ -25,7 +25,8 @@
     <string name="scan_results">Scan results (tap to connect)</string>
     <string name="connected">●  CONNECTED</string>
     <string name="main_tab">MAIN</string>
-    <string name="raw_data_tab">RAW DATA</string>
+    <string name="raw_data_tab">RAW SENSOR DATA</string>
+    <string name="raw_conf_data_tab">RAW CONF DATA</string>
     <string name="refresh_sensor">Refresh sensor</string>
     <string name="close">Close</string>
     <string name="enabled">Enabled</string>
