@@ -39,6 +39,9 @@ class BleOperationsActivity : AppCompatActivity() {
     private val sensorSettings = mutableMapOf<String, SensorSetting>()
     private val pendingWrites = ConcurrentLinkedQueue<PendingWrite>()
     private var publishIntervalSeconds = DEFAULT_INTERVAL_SECONDS
+    private val isCloudMode by lazy {
+        intent.getBooleanExtra(EXTRA_CLOUD_MODE, false)
+    }
     private val device: BluetoothDevice by lazy {
         intent.parcelableExtraCompat(BluetoothDevice.EXTRA_DEVICE)
             ?: error("Missing BluetoothDevice from MainActivity")
@@ -49,20 +52,26 @@ class BleOperationsActivity : AppCompatActivity() {
         binding = ActivityBleOperationsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        ConnectionManager.registerListener(connectionEventListener)
+        if (!isCloudMode) {
+            ConnectionManager.registerListener(connectionEventListener)
+        }
         MqttManager.connect()
         showDeviceDetails()
         setupDashboardRows()
         setupActions()
-        subscribeToNotifications()
-        sendTimeSyncCmd()
+        if (!isCloudMode) {
+            subscribeToNotifications()
+            sendTimeSyncCmd()
+        }
         showMainTab(showToast = false)
     }
 
     override fun onDestroy() {
         MqttManager.disconnect()
-        ConnectionManager.unregisterListener(connectionEventListener)
-        if (isFinishing) {
+        if (!isCloudMode) {
+            ConnectionManager.unregisterListener(connectionEventListener)
+        }
+        if (!isCloudMode && isFinishing) {
             ConnectionManager.teardownConnection(device)
         }
         super.onDestroy()
@@ -70,6 +79,12 @@ class BleOperationsActivity : AppCompatActivity() {
 
     @SuppressLint("MissingPermission", "SetTextI18n")
     private fun showDeviceDetails() {
+        if (isCloudMode) {
+            binding.connectedDeviceName.text = "Connected to: Cloud"
+            binding.connectedDeviceAddress.text = "Cloud mode"
+            return
+        }
+
         val name = if (hasRequiredBluetoothPermissions()) {
             device.name ?: getString(R.string.app_name)
         } else {
@@ -285,6 +300,12 @@ class BleOperationsActivity : AppCompatActivity() {
 
     private fun sendBleCommand(label: String, command: String): Boolean {
         Timber.i("JSON payload generated: $command")
+        if (isCloudMode) {
+            Timber.w("$label ignored because BLE is unavailable in cloud mode")
+            toast("$label unavailable in cloud mode")
+            return false
+        }
+
         val service = ConnectionManager.servicesOnDevice(device)
             ?.firstOrNull { it.uuid == TRACK_TAIL_SERVICE_UUID }
         if (service == null) {
@@ -581,7 +602,8 @@ class BleOperationsActivity : AppCompatActivity() {
 
     private data class PendingWrite(val label: String)
 
-    private companion object {
+    companion object {
+        const val EXTRA_CLOUD_MODE = "extra_cloud_mode"
         const val DEFAULT_INTERVAL_SECONDS = 30
         const val INTERVAL_STEP_SECONDS = 5
         const val MIN_INTERVAL_SECONDS = 5

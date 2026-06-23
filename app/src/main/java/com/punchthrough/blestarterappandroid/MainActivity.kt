@@ -117,6 +117,12 @@ class MainActivity : AppCompatActivity() {
             showToast(if (isScanning) "Stop Scan pressed" else "Start Scan pressed")
             if (isScanning) stopBleScan() else startBleScan()
         }
+        binding.fromCloudButton.setOnClickListener {
+            startActivity(
+                Intent(this, BleOperationsActivity::class.java)
+                    .putExtra(BleOperationsActivity.EXTRA_CLOUD_MODE, true)
+            )
+        }
         binding.settingsButton.setOnClickListener { showToast("Settings pressed") }
         setupRecyclerView()
     }
