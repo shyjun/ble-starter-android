@@ -56,6 +56,10 @@ class BleOperationsActivity : AppCompatActivity() {
             ConnectionManager.registerListener(connectionEventListener)
         }
         MqttManager.connect()
+        MqttManager.onMessageReceived = { topic, payload ->
+            runOnUiThread { appendRawNotification(payload) }
+        }
+        MqttManager.subscribe("tracktrail/+/sensor_data")
         showDeviceDetails()
         setupDashboardRows()
         setupActions()
@@ -67,6 +71,7 @@ class BleOperationsActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        MqttManager.onMessageReceived = null
         MqttManager.disconnect()
         if (!isCloudMode) {
             ConnectionManager.unregisterListener(connectionEventListener)
@@ -143,7 +148,9 @@ class BleOperationsActivity : AppCompatActivity() {
         if (line.isEmpty()) return
 
         updateSensorValues(line)
-        MqttManager.publish("tracktrail/AABBCCDDEEFF/sensor_data", line)
+        if (!isCloudMode) {
+            MqttManager.publish("tracktrail/AABBCCDDEEFF/sensor_data", line)
+        }
         val currentText = binding.rawDataText.text
         binding.rawDataText.text = if (currentText.isNullOrEmpty()) {
             line
