@@ -244,6 +244,7 @@ class BleOperationsActivity : AppCompatActivity() {
             updateDummyValue(json)
             updateDummy2Value(json)
             updateGpsValue(json)
+            updateImuValue(json)
         } catch (exception: JSONException) {
             Timber.w(exception, "Notification payload is not valid JSON")
         }
@@ -275,6 +276,15 @@ class BleOperationsActivity : AppCompatActivity() {
 
         binding.gpsRow.metricValue.text = "$latitude\n$longitude"
         Timber.i("GPS location updated: lat=$latitude, lon=$longitude")
+    }
+
+    private fun updateImuValue(json: JSONObject) {
+        val imu = json.optJSONObject("imu") ?: return
+        val steps = imu.optInt("tot_step", -1)
+        if (steps >= 0) {
+            binding.stepsRow.metricValue.text = "$steps\nsteps"
+            Timber.i("Step count updated: $steps")
+        }
     }
 
     private fun setupDashboardRows() {
