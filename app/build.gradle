@@ -26,6 +26,7 @@ android {
         versionCode 2
         versionName "2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "String", "GIT_HASH", "\"${"git rev-parse --short HEAD".execute().text.trim()}\""
     }
     buildFeatures {
         viewBinding true

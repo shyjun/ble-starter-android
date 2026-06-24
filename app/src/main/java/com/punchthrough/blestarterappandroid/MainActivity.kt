@@ -113,6 +113,7 @@ class MainActivity : AppCompatActivity() {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
+        binding.welcomeText.text = "Welcome to Track Tail (${BuildConfig.GIT_HASH})"
         binding.scanButton.setOnClickListener {
             showToast(if (isScanning) "Stop Scan pressed" else "Start Scan pressed")
             if (isScanning) stopBleScan() else startBleScan()
