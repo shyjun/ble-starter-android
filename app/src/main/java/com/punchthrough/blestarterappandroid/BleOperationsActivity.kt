@@ -245,6 +245,7 @@ class BleOperationsActivity : AppCompatActivity() {
             updateDummy2Value(json)
             updateGpsValue(json)
             updateImuValue(json)
+            updateHrValue(json)
         } catch (exception: JSONException) {
             Timber.w(exception, "Notification payload is not valid JSON")
         }
@@ -284,6 +285,15 @@ class BleOperationsActivity : AppCompatActivity() {
         if (steps >= 0) {
             binding.stepsRow.metricValue.text = "$steps\nsteps"
             Timber.i("Step count updated: $steps")
+        }
+    }
+
+    private fun updateHrValue(json: JSONObject) {
+        val hr = json.optJSONObject("sensor_hr_data") ?: return
+        val avg = hr.optString("AVG")
+        if (avg.isNotEmpty()) {
+            binding.heartRateRow.metricValue.text = "$avg\nBPM"
+            Timber.i("Heart rate updated: $avg BPM")
         }
     }
 
