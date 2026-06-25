@@ -246,6 +246,7 @@ class BleOperationsActivity : AppCompatActivity() {
             updateGpsValue(json)
             updateImuValue(json)
             updateHrValue(json)
+            updateTemperatureValue(json)
         } catch (exception: JSONException) {
             Timber.w(exception, "Notification payload is not valid JSON")
         }
@@ -294,6 +295,15 @@ class BleOperationsActivity : AppCompatActivity() {
         if (avg.isNotEmpty()) {
             binding.heartRateRow.metricValue.text = "$avg\nBPM"
             Timber.i("Heart rate updated: $avg BPM")
+        }
+    }
+
+    private fun updateTemperatureValue(json: JSONObject) {
+        val temp = json.optJSONObject("sensor_temperature_data") ?: return
+        if (temp.has("val")) {
+            val value = temp.get("val").toString()
+            binding.temperatureRow.metricValue.text = "$value\n°C"
+            Timber.i("Temperature updated: $value °C")
         }
     }
 
