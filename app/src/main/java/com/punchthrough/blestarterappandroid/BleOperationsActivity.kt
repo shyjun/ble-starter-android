@@ -330,7 +330,9 @@ class BleOperationsActivity : AppCompatActivity() {
             "Temperature",
             "?\n°C",
             "sensor_temperature"
-        )
+        ) {
+            sendSensorRefresh("Temperature", "sensor_temperature")
+        }
         configureRow(
             binding.batteryRow,
             "▯",
